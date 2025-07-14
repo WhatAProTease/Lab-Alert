@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Lab Safety Check-In</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      padding: 2rem;
+      background: #f0f4f8;
+      margin: 0;
+    }
+    h1 {
+      margin-top: 1rem;
+    }
+    .timer {
+      font-size: 3rem;
+      margin: 1rem 0;
+    }
+    input, button {
+      padding: 0.75rem;
+      font-size: 1.2rem;
+      margin: 0.5rem;
+      border-radius: 0.5rem;
+      border: 1px solid #ccc;
+    }
+    button {
+      background-color: #0077cc;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #005fa3;
+    }
+    @media (max-width: 600px) {
+      .timer {
+        font-size: 2.5rem;
+      }
+      input, button {
+        font-size: 1rem;
+        padding: 0.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Lab Safety Check-In</h1>
+
+  <div>
+    <input type="text" id="nameInput" placeholder="Your Name" />
+    <input type="text" id="exitTimeInput" placeholder="Planned Exit Time (e.g. 18:00)" />
+  </div>
+
+  <p class="timer" id="timer">60:00</p>
+  <button onclick="resetTimer()">Check In</button>
+
+  <script>
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxNdVXKc1Z1bKLAFXPLVQi0VVacSaQkKL622k6zaqw5F60XtGjaoT5z67AgYmBPLIjJMg/exec"; 
+    let duration = 60 * 60; // 60 minutes in seconds
+    let remaining = duration;
+    let timerDisplay = document.getElementById("timer");
+    let timerInterval = null;
+    let alertSent = false;
+
+    function formatTime(seconds) {
+      const mins = String(Math.floor(seconds / 60)).padStart(2, '0');
+      const secs = String(seconds % 60).padStart(2, '0');
+      return `${mins}:${secs}`;
+    }
+
+    function sendToGoogleScript(data) {
+      fetch(SCRIPT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      }).then(res => console.log("✅ Sent to Google Apps Script"))
+        .catch(err => console.error("❌ Failed to send", err));
+    }
+
+    function sendAlert() {
+      if (alertSent) return;
+      alertSent = true;
+
+      const name = document.getElementById("nameInput").value;
+
+      sendToGoogleScript({
+        type: "missed",
+        name: name,
+        message: "Missed lab check-in"
+      });
+    }
+
+    function startTimer() {
+      if (timerInterval) clearInterval(timerInterval);
+      alertSent = false;
+
+      timerInterval = setInterval(() => {
+        if (remaining > 0) {
+          remaining--;
+          timerDisplay.textContent = formatTime(remaining);
+        } else {
+          timerDisplay.textContent = "00:00";
+          sendAlert();
+          clearInterval(timerInterval);
+        }
+      }, 1000);
+    }
+
+    function resetTimer() {
+      const name = document.getElementById("nameInput").value;
+      const exitTime = document.getElementById("exitTimeInput").value;
+
+      if (!name || !exitTime) {
+        alert("Please enter your name and planned exit time.");
+        return;
+      }
+
+      remaining = duration;
+      timerDisplay.textContent = formatTime(remaining);
+      startTimer();
+
+      sendToGoogleScript({
+        type: "checkin",
+        name: name,
+        exitTime: exitTime
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      timerDisplay.textContent = formatTime(remaining);
+      startTimer();
+    });
+  </script>
+</body>
+</html>
+
