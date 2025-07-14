@@ -13,58 +13,55 @@
       margin: 0;
     }
     h1 {
-      margin-top: 1rem;
+      margin-bottom: 1rem;
+    }
+    input {
+      margin: 0.5rem;
+      padding: 0.7rem;
+      font-size: 1rem;
+      width: 250px;
+      max-width: 80%;
     }
     .timer {
       font-size: 3rem;
       margin: 1rem 0;
     }
-    input, button {
-      padding: 0.75rem;
-      font-size: 1.2rem;
-      margin: 0.5rem;
-      border-radius: 0.5rem;
-      border: 1px solid #ccc;
-    }
     button {
+      padding: 1rem 2rem;
+      font-size: 1.2rem;
+      border: none;
       background-color: #0077cc;
       color: white;
-      border: none;
+      border-radius: 0.5rem;
       cursor: pointer;
+      margin: 1rem;
+      transition: background-color 0.3s ease;
     }
     button:hover {
       background-color: #005fa3;
     }
-    @media (max-width: 600px) {
-      .timer {
-        font-size: 2.5rem;
-      }
-      input, button {
-        font-size: 1rem;
-        padding: 0.5rem;
-      }
-    }
   </style>
 </head>
 <body>
-
   <h1>Lab Safety Check-In</h1>
 
   <div>
     <input type="text" id="nameInput" placeholder="Your Name" />
     <input type="text" id="exitTimeInput" placeholder="Planned Exit Time (e.g. 18:00)" />
   </div>
-  
+
   <p class="timer" id="timer">60:00</p>
   <button onclick="resetTimer()">Check In</button>
-  
-  <div>
-    <input type="text" id="nameInput" placeholder="Your Name" />
-    <input type="text" id="exitTimeInput" placeholder="Finished Lab Work" />
+
+  <div style="margin-top: 2rem;">
+    <h3>Leaving the Lab?</h3>
+    <input type="text" id="checkoutNameInput" placeholder="Your Name" />
+    <button onclick="checkOut()">Check Out</button>
   </div>
-    
+
   <script>
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxNdVXKc1Z1bKLAFXPLVQi0VVacSaQkKL622k6zaqw5F60XtGjaoT5z67AgYmBPLIjJMg/exec"; 
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxNdVXKc1Z1bKLAFXPLVQi0VVacSaQkKL622k6zaqw5F60XtGjaoT5z67AgYmBPLIjJMg/exec";
+
     let duration = 60 * 60; // 60 minutes in seconds
     let remaining = duration;
     let timerDisplay = document.getElementById("timer");
@@ -77,26 +74,22 @@
       return `${mins}:${secs}`;
     }
 
-    function sendToGoogleScript(data) {
-      fetch(SCRIPT_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data)
-      }).then(res => console.log("✅ Sent to Google Apps Script"))
-        .catch(err => console.error("❌ Failed to send", err));
-    }
-
-    function sendAlert() {
+    function sendAlert(name) {
       if (alertSent) return;
       alertSent = true;
 
-      const name = document.getElementById("nameInput").value;
-
-      sendToGoogleScript({
-        type: "missed",
-        name: name,
-        message: "Missed lab check-in"
-      });
+      fetch(SCRIPT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "missed",
+          name: name || "Unknown",
+          message: "Missed lab check-in!"
+        })
+      })
+      .then(res => res.text())
+      .then(text => console.log(text))
+      .catch(err => console.error("Alert failed to send:", err));
     }
 
     function startTimer() {
@@ -109,7 +102,8 @@
           timerDisplay.textContent = formatTime(remaining);
         } else {
           timerDisplay.textContent = "00:00";
-          sendAlert();
+          const name = document.getElementById("nameInput").value;
+          sendAlert(name);
           clearInterval(timerInterval);
         }
       }, 1000);
@@ -119,8 +113,8 @@
       const name = document.getElementById("nameInput").value;
       const exitTime = document.getElementById("exitTimeInput").value;
 
-      if (!name || !exitTime) {
-        alert("Please enter your name and planned exit time.");
+      if (!name) {
+        alert("Please enter your name before checking in.");
         return;
       }
 
@@ -128,18 +122,48 @@
       timerDisplay.textContent = formatTime(remaining);
       startTimer();
 
-      sendToGoogleScript({
-        type: "checkin",
-        name: name,
-        exitTime: exitTime
+      fetch(SCRIPT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "checkin",
+          name: name,
+          exitTime: exitTime
+        })
+      })
+      .then(res => res.text())
+      .then(text => console.log(text))
+      .catch(err => console.error("Check-in failed:", err));
+    }
+
+    function checkOut() {
+      const name = document.getElementById("checkoutNameInput").value;
+
+      if (!name) {
+        alert("Please enter your name to check out.");
+        return;
+      }
+
+      fetch(SCRIPT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "checkout",
+          name: name
+        })
+      })
+      .then(res => res.text())
+      .then(text => {
+        alert("✅ Check-out logged.");
+        console.log(text);
+      })
+      .catch(err => {
+        console.error("Error logging check-out:", err);
+        alert("❌ Check-out failed.");
       });
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
-      timerDisplay.textContent = formatTime(remaining);
-      startTimer();
-    });
+    document.addEventListener('DOMContentLoaded', startTimer);
   </script>
 </body>
 </html>
-
